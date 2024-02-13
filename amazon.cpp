@@ -108,7 +108,7 @@ int main(int argc, char* argv[])
                         // Assuming MyDataStore has an addProductToUserCart method
                         ds->addProductToUserCart(username, hits[hitNumber - 1]);
                     } else {
-                        cout << "Invalid hit number" << endl;
+                        cout << "Invalid request" << endl;
                     }
                 } else {
                     cout << "Invalid command format" << endl;

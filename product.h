@@ -45,5 +45,6 @@ protected:
     int qty_;
     std::string category_;
 
+    std::set<std::string> keywordSet;
 };
 #endif

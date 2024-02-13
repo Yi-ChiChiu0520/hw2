@@ -27,29 +27,26 @@ MyDataStore::~MyDataStore() {
 */
 void MyDataStore::addProduct(Product* p){
     // add product to vector product
-    products.push_back(p); 
+    products.insert(p);
 
     // Use parseStringToWords to process product name and/or description for keywords
-    std::set<std::string> nameKeywords = parseStringToWords(p->getName());
-    // If applicable, extend to other fields like description
-    // std::set<std::string> descriptionKeywords = parseStringToWords(p->getDescription());
-    
-    // Combine keywords from all relevant fields (for now, just the name)
-    std::set<std::string> combinedKeywords = nameKeywords;
-    // If applicable, merge description keywords
-    // combinedKeywords.insert(descriptionKeywords.begin(), descriptionKeywords.end());
+    std::set<std::string> keywords = p->keywords();
 
-    // Insert product into keyword map
-    for(std::set<std::string>::iterator k = combinedKeywords.begin(); k != combinedKeywords.end(); ++k) {
-        keywordToProducts[*k].insert(p);
-    }
+    for (std::string keyword: keywords) {
+      if (keywordToProducts.find(keyword) == keywordToProducts.end()) {
+        keywordToProducts[keyword] = std::set<Product*>();
+      }
+      keywordToProducts[keyword].insert(p);
+    }   
 }
 
 /**     
 * * Adds a user to the data store
 */
 void MyDataStore::addUser(User* u){
-    users.push_back(u);
+    users.insert(u);
+
+    userMap[u->getName()] = u;
 }
 
 /**
@@ -58,36 +55,34 @@ void MyDataStore::addUser(User* u){
 *  type 1 = OR search (union of results for each term)
 */
 std::vector<Product*> MyDataStore:: search(std::vector<std::string>& terms, int type){
-std::vector<Product*> results;
-    std::set<Product*> searchResults;
+    std::vector<Product*> results;
     if(terms.empty()) return results;
 
-    for(std::vector<std::string>::iterator term = terms.begin(); term != terms.end(); ++term) {
-        *term = convToLower(*term);
+    std::set<Product*> searchResults;
+    std::string term = terms.back();
+    terms.pop_back();
+    if (keywordToProducts.find(term) == keywordToProducts.end()) {
+      searchResults = std::set<Product *>();
+    } else{ 
+      searchResults = keywordToProducts[term];
     }
 
-    // Initialize searchResults appropriately based on the search type
-    if(type == 0 && !terms.empty()) { // AND search initialization
-        searchResults = keywordToProducts[terms[0]];
-    }
-    // Perform the search
-    for(size_t i = (type == 0 ? 1 : 0); i < terms.size(); ++i) {
-        if(keywordToProducts.find(terms[i]) != keywordToProducts.end()) {
-            if(type == 0) { // AND search
-                searchResults = setIntersection(searchResults, keywordToProducts[terms[i]]);
-            } else { // OR search
-                searchResults = setUnion(searchResults, keywordToProducts[terms[i]]);
-            }
-        } else if (type == 0) { // If AND search and term not found, clear results
-            searchResults.clear();
-            break;
-        }
+    for (std::string currentTerm: terms) {
+      std::set<Product *> currentTermResults;
+      if (keywordToProducts.find(currentTerm) == keywordToProducts.end()) {
+        currentTermResults = std::set<Product *>();
+      } else{ 
+        currentTermResults = keywordToProducts[currentTerm];
+      }
+
+      if (type == 0) {
+        searchResults = setIntersection(searchResults,currentTermResults);
+      } else {
+        searchResults = setUnion(searchResults,currentTermResults);
+      }
     }
 
-    for(std::set<Product*>::iterator p = searchResults.begin(); p != searchResults.end(); ++p) {
-        results.push_back(*p);
-    }
-    return results;
+    return std::vector<Product *>(searchResults.begin(),searchResults.end());
 }
 
 /**
@@ -108,37 +103,57 @@ void MyDataStore::dump(std::ostream& ofile){
 }
 
 void MyDataStore::addProductToUserCart(const std::string& username, Product* product) {
-    std::string userKey = convToLower(username);
-    auto it = std::find_if(users.begin(), users.end(), [&userKey](const User* user) {
-        return convToLower(user->getName()) == userKey;
-    });
-    if (it != users.end()) {
-        (*it)->addToCart(product);
-    } else {
-        std::cerr << "Invalid username" << std::endl;
+    if (userMap.find(username) == userMap.end()) {
+      std::cout << "Invalid request" << std::endl;
+      return;
     }
+
+    User *user = userMap[username];
+    if (userCart.find(user) == userCart.end()) {
+      userCart[user] = std::vector<Product*>();
+    }
+    
+    userCart[user].push_back(product);
 }
 
 void MyDataStore::viewUserCart(const std::string& username) {
-    std::string userKey = convToLower(username);
-    auto it = std::find_if(users.begin(), users.end(), [&userKey](const User* user) {
-        return convToLower(user->getName()) == userKey;
-    });
-    if (it != users.end()) {
-        (*it)->viewCart();
-    } else {
-        std::cerr << "Invalid username" << std::endl;
+    std::map<std::string, User*>::iterator it = userMap.find(username);
+    int count=0; 
+    if (it == userMap.end()) {
+      std::cout << "Invalid username" << std::endl;
+      return; 
     }
+        User* user = it->second;
+        std::map<User *, std::vector<Product *>>::iterator cartIt = userCart.find(user);
+        if (cartIt != userCart.end()) {
+            for (std::vector<Product*>::iterator prodIt = cartIt->second.begin(); prodIt != cartIt->second.end(); ++prodIt) {
+                ++count; 
+                cout<<"Item "<<count<<endl;
+                std::cout << (*prodIt)->displayString() << std::endl;
+            }
+        } else {
+            std::cout << "The cart is empty." << std::endl;
+        }
 }
 
+
 void MyDataStore::buyUserCart(const std::string& username) {
-    std::string userKey = convToLower(username);
-    auto it = std::find_if(users.begin(), users.end(), [&userKey](const User* user) {
-        return convToLower(user->getName()) == userKey;
-    });
-    if (it != users.end()) {
-        (*it)->buyCart();
-    } else {
-        std::cerr << "Invalid username" << std::endl;
+    std::map<std::string, User*>::iterator userIt = userMap.find(convToLower(username)); // Explicit iterator type
+    if (userIt == userMap.end()) {
+      std::cout << "Invalid username" << std::endl;
+      return;
     }
-}
+        User* user = userIt->second;
+        std::vector<Product*>& cart = userCart[user]; // Direct reference to avoid unnecessary lookups
+
+        for (std::vector<Product*>::iterator it = cart.begin(); it != cart.end();) {
+            Product* product = *it;
+            if (product->getQty() > 0 && user->getBalance() >= product->getPrice()) {
+                user->deductAmount(product->getPrice());
+                product->subtractQty(1);
+                it = cart.erase(it); // Remove product after purchase
+            } else {
+                ++it; // Skip this product if not purchasable
+            }
+        }
+} 

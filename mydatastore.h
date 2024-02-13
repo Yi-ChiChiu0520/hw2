@@ -39,8 +39,14 @@ public:
     
 private: 
     // Containers for managing products and users
-    std::vector<Product*> products;
-    std::vector<User*> users;
+    std::set<Product*> products;
+    std::set<User*> users;
+
+    // Username to user
+    std::map<std::string, User*> userMap;
+
+    // User to cart
+    std::map<User *, std::vector<Product *>> userCart;
 
     // Maps each keyword to a set of products that contain that keyword
     std::map<std::string, std::set<Product*>> keywordToProducts;

@@ -1,22 +1,32 @@
 #include <sstream>
 #include "book.h"
+#include "util.h"
 
 using namespace std;
 
 Book::Book(const std::string category, const std::string name, double price, int qty, const std::string& ISBN, const std::string& author)
-    : Product(category, name, price, qty), ISBN_(ISBN), author_(author) {}
+    : Product(category, name, price, qty), ISBN_(ISBN), author_(author) {
+
+  
+
+}
 
 Book::~Book() {}
 
 std::set<std::string> Book::keywords() const {
-    std::set<std::string> kw;
-    kw.insert(ISBN_);
-    std::istringstream iss(author_);
-    std::string word;
-    while (iss >> word) {
-        kw.insert(word);
-    }
-    return kw;
+  std::set<std::string> keywordSet;
+  
+  keywordSet.insert(ISBN_);
+
+  // Extract keywords from the name
+  std::set<std::string> nameKeywords = parseStringToWords(convToLower(name_));
+  keywordSet.insert(nameKeywords.begin(), nameKeywords.end());
+
+  // Extract keywords from the author
+  std::set<std::string> authorKeywords = parseStringToWords(convToLower(author_));
+  keywordSet.insert(authorKeywords.begin(), authorKeywords.end());
+  
+  return keywordSet;
 }
 
 
